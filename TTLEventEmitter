@@ -1,0 +1,36 @@
+const EventEmitter = require('events').EventEmitter;
+
+//30 minutes. We assume that V8 can handle many events waiting depending on the size of the RAM (there are all kind of
+//  waiting callbacks the libvu and the system handles). 
+// However there is no point for the original purpose of this class to wait more than 30 min (wait for http response) 
+//  and probably more than 2 minutes is inconsible thus cleanning the event after 30 seconds sound reasonable
+const DEFAULT_TTL = 1800000;
+
+class TTLEventEmitter extends EventEmitter {
+    constructor() {
+        super();
+        //Using -1 value will cancel the TTL feature
+        this.ttl = DEFAULT_TTL;
+        this.liveEvents = {};
+        this.on('newListener', this.trackEventListener.bind(this));
+    }
+
+    trackEventListener(event, listener) {
+        this.liveEvents[event] = Date.now();
+        this.cleanOldEvents(); //Event are cleaned after their ttl but only when new event is registered
+    }
+
+    cleanOldEvents() {
+        if(this.ttl < 0) {
+            //negative ttl means no cleaning
+            return;
+        }
+        let now = Date.now();
+        for(let prop in this.liveEvents) {
+            if(this.liveEvents[prop] < now-this.ttl) {
+                this.removeAllListeners(prop);
+                delete this.liveEvents[prop];
+            }
+        }
+    }
+}
